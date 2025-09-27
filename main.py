@@ -66,20 +66,36 @@ CHANGE_IMG = pygame.USEREVENT + 3
 pygame.time.set_timer(CHANGE_IMG, 125)
 
 
+def draw_text_center(text, font_obj, color, y):
+    surf = font_obj.render(text, True, color)
+    main_surface.blit(surf, (width // 2 - surf.get_width() // 2, y))
+
+
+def draw_start_screen():
+    main_surface.fill(BLACK)
+    draw_text_center("GOOSE GAME", big_font, GREEN, height // 3)
+    draw_text_center("Press ENTER to Start", font, WHITE, height // 2)
+    draw_text_center(
+        "Use arrows to move, collect bonuses, avoid enemies",
+        font,
+        WHITE,
+        height // 2 + 40,
+    )
+    pygame.display.flip()
+
+
 def draw_game_over(final_score):
     main_surface.fill(BLACK)
-    text1 = big_font.render("GAME OVER", True, RED)
-    text2 = font.render(f"Your score: {final_score}", True, WHITE)
-    text3 = font.render("Press ENTER to restart or ESC to quit", True, WHITE)
-
-    main_surface.blit(text1, (width // 2 - text1.get_width() // 2, height // 3))
-    main_surface.blit(text2, (width // 2 - text2.get_width() // 2, height // 2))
-    main_surface.blit(text3, (width // 2 - text3.get_width() // 2, height // 2 + 40))
+    draw_text_center("GAME OVER", big_font, RED, height // 3)
+    draw_text_center(f"Your score: {final_score}", font, WHITE, height // 2)
+    draw_text_center(
+        "Press ENTER to Restart or ESC to Quit", font, WHITE, height // 2 + 40
+    )
     pygame.display.flip()
 
 
 def reset_game():
-    global player, player_rect, img_index, scores, enemies, bonuses, game_over, bgX, bgX2
+    global player, player_rect, img_index, scores, enemies, bonuses, game_over, bgX, bgX2, game_started
     player = player_imgs[0]
     player_rect = player.get_rect()
     img_index = 0
@@ -89,6 +105,7 @@ def reset_game():
     bgX = 0
     bgX2 = bg.get_width()
     game_over = False
+    game_started = True
 
 
 # --- Початковий стан ---
@@ -99,6 +116,7 @@ bonuses = []
 bgX = 0
 bgX2 = bg.get_width()
 game_over = False
+game_started = False
 is_working = True
 
 
@@ -106,8 +124,18 @@ is_working = True
 while is_working:
     FPS.tick(60)
 
-    if not game_over:
+    if not game_started:
+        # малюємо стартовий екран
+        draw_start_screen()
 
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                is_working = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == K_RETURN:  # Почати гру
+                    reset_game()
+
+    elif not game_over:
         for event in pygame.event.get():
             if event.type == QUIT:
                 is_working = False
@@ -187,7 +215,6 @@ while is_working:
     else:
         draw_game_over(scores)
 
-        # чекаємо ENTER або ESC
         for event in pygame.event.get():
             if event.type == QUIT:
                 is_working = False
