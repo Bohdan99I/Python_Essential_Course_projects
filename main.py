@@ -17,6 +17,7 @@ RED = 255, 0, 0
 GREEN = 0, 255, 0
 
 font = pygame.font.SysFont("Verdana", 20)
+big_font = pygame.font.SysFont("Verdana", 50, bold=True)
 
 main_surface = pygame.display.set_mode(screen)
 
@@ -71,83 +72,109 @@ enemies = []
 bonuses = []
 
 is_working = True
+game_over = False
+
+
+def draw_game_over(final_score):
+    main_surface.fill(BLACK)
+    text1 = big_font.render("GAME OVER", True, RED)
+    text2 = font.render(f"Your score: {final_score}", True, WHITE)
+    text3 = font.render("Press any key to exit", True, WHITE)
+
+    main_surface.blit(text1, (width // 2 - text1.get_width() // 2, height // 3))
+    main_surface.blit(text2, (width // 2 - text2.get_width() // 2, height // 2))
+    main_surface.blit(text3, (width // 2 - text3.get_width() // 2, height // 2 + 40))
+    pygame.display.flip()
+
 
 while is_working:
 
     FPS.tick(60)
 
-    for event in pygame.event.get():
-        if event.type == QUIT:
-            is_working = False
+    if not game_over:
 
-        if event.type == CREATE_ENEMY:
-            enemies.append(create_enemy())
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                is_working = False
 
-        if event.type == CREATE_BONUS:
-            bonuses.append(create_bonus())
+            if event.type == CREATE_ENEMY:
+                enemies.append(create_enemy())
 
-        if event.type == CHANGE_IMG:
-            img_index += 1
-            if img_index == len(player_imgs):
-                img_index = 0
-            player = player_imgs[img_index]
+            if event.type == CREATE_BONUS:
+                bonuses.append(create_bonus())
 
-    pressed_keys = pygame.key.get_pressed()
+            if event.type == CHANGE_IMG:
+                img_index += 1
+                if img_index == len(player_imgs):
+                    img_index = 0
+                player = player_imgs[img_index]
 
-    # рух фону
-    bgX -= bg_speed
-    bgX2 -= bg_speed
+        pressed_keys = pygame.key.get_pressed()
 
-    if bgX < -bg.get_width():
-        bgX = bgX2 + bg.get_width()
+        # рух фону
+        bgX -= bg_speed
+        bgX2 -= bg_speed
 
-    if bgX2 < -bg.get_width():
-        bgX2 = bgX + bg.get_width()
+        if bgX < -bg.get_width():
+            bgX = bgX2 + bg.get_width()
 
-    # малювання фону
-    main_surface.blit(bg, (bgX, 0))
-    main_surface.blit(bg, (bgX2, 0))
+        if bgX2 < -bg.get_width():
+            bgX2 = bgX + bg.get_width()
 
-    # малювання гравця
-    main_surface.blit(player, player_rect)
+        # малювання фону
+        main_surface.blit(bg, (bgX, 0))
+        main_surface.blit(bg, (bgX2, 0))
 
-    # малювання рахунку
-    main_surface.blit(font.render(str(scores), True, RED), (width - 50, 20))
+        # малювання гравця
+        main_surface.blit(player, player_rect)
 
-    # рух ворогів
-    for enemy in enemies[:]:
-        enemy[1] = enemy[1].move(-enemy[2], 0)
-        main_surface.blit(enemy[0], enemy[1])
+        # малювання рахунку
+        main_surface.blit(font.render(str(scores), True, RED), (width - 50, 20))
 
-        if enemy[1].right < 0:
-            enemies.remove(enemy)
+        # рух ворогів
+        for enemy in enemies[:]:
+            enemy[1] = enemy[1].move(-enemy[2], 0)
+            main_surface.blit(enemy[0], enemy[1])
 
-        if player_rect.colliderect(enemy[1]):
-            is_working = False
+            if enemy[1].right < 0:
+                enemies.remove(enemy)
 
-    # рух бонусів
-    for bonus in bonuses[:]:
-        bonus[1] = bonus[1].move(0, bonus[2])
-        main_surface.blit(bonus[0], bonus[1])
+            if player_rect.colliderect(enemy[1]):
+                game_over = True
 
-        if bonus[1].top > height:
-            bonuses.remove(bonus)
+        # рух бонусів
+        for bonus in bonuses[:]:
+            bonus[1] = bonus[1].move(0, bonus[2])
+            main_surface.blit(bonus[0], bonus[1])
 
-        if player_rect.colliderect(bonus[1]):
-            bonuses.remove(bonus)
-            scores += 1
+            if bonus[1].top > height:
+                bonuses.remove(bonus)
 
-    # керування гравцем
-    if pressed_keys[K_DOWN] and player_rect.bottom < height:
-        player_rect = player_rect.move(0, player_speed)
+            if player_rect.colliderect(bonus[1]):
+                bonuses.remove(bonus)
+                scores += 1
 
-    if pressed_keys[K_UP] and player_rect.top > 0:
-        player_rect = player_rect.move(0, -player_speed)
+        # керування гравцем
+        if pressed_keys[K_DOWN] and player_rect.bottom < height:
+            player_rect = player_rect.move(0, player_speed)
 
-    if pressed_keys[K_RIGHT] and player_rect.right < width:
-        player_rect = player_rect.move(player_speed, 0)
+        if pressed_keys[K_UP] and player_rect.top > 0:
+            player_rect = player_rect.move(0, -player_speed)
 
-    if pressed_keys[K_LEFT] and player_rect.left > 0:
-        player_rect = player_rect.move(-player_speed, 0)
+        if pressed_keys[K_RIGHT] and player_rect.right < width:
+            player_rect = player_rect.move(player_speed, 0)
 
-    pygame.display.flip()
+        if pressed_keys[K_LEFT] and player_rect.left > 0:
+            player_rect = player_rect.move(-player_speed, 0)
+
+        pygame.display.flip()
+
+    else:
+        draw_game_over(scores)
+
+        # чекаємо будь-яку клавішу або закриття
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                is_working = False
+            elif event.type == pygame.KEYDOWN:
+                is_working = False
