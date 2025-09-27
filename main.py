@@ -2,7 +2,7 @@ import random
 from os import listdir
 
 import pygame
-from pygame.constants import QUIT, K_DOWN, K_UP, K_LEFT, K_RIGHT
+from pygame.constants import QUIT, K_DOWN, K_UP, K_LEFT, K_RIGHT, K_RETURN
 
 
 pygame.init()
@@ -65,21 +65,12 @@ pygame.time.set_timer(CREATE_BONUS, 1500)
 CHANGE_IMG = pygame.USEREVENT + 3
 pygame.time.set_timer(CHANGE_IMG, 125)
 
-img_index = 0
-scores = 0
-
-enemies = []
-bonuses = []
-
-is_working = True
-game_over = False
-
 
 def draw_game_over(final_score):
     main_surface.fill(BLACK)
     text1 = big_font.render("GAME OVER", True, RED)
     text2 = font.render(f"Your score: {final_score}", True, WHITE)
-    text3 = font.render("Press any key to exit", True, WHITE)
+    text3 = font.render("Press ENTER to restart or ESC to quit", True, WHITE)
 
     main_surface.blit(text1, (width // 2 - text1.get_width() // 2, height // 3))
     main_surface.blit(text2, (width // 2 - text2.get_width() // 2, height // 2))
@@ -87,8 +78,32 @@ def draw_game_over(final_score):
     pygame.display.flip()
 
 
-while is_working:
+def reset_game():
+    global player, player_rect, img_index, scores, enemies, bonuses, game_over, bgX, bgX2
+    player = player_imgs[0]
+    player_rect = player.get_rect()
+    img_index = 0
+    scores = 0
+    enemies = []
+    bonuses = []
+    bgX = 0
+    bgX2 = bg.get_width()
+    game_over = False
 
+
+# --- Початковий стан ---
+img_index = 0
+scores = 0
+enemies = []
+bonuses = []
+bgX = 0
+bgX2 = bg.get_width()
+game_over = False
+is_working = True
+
+
+# --- Основний цикл ---
+while is_working:
     FPS.tick(60)
 
     if not game_over:
@@ -172,9 +187,12 @@ while is_working:
     else:
         draw_game_over(scores)
 
-        # чекаємо будь-яку клавішу або закриття
+        # чекаємо ENTER або ESC
         for event in pygame.event.get():
             if event.type == QUIT:
                 is_working = False
             elif event.type == pygame.KEYDOWN:
-                is_working = False
+                if event.key == K_RETURN:  # Restart
+                    reset_game()
+                elif event.key == pygame.K_ESCAPE:  # Quit
+                    is_working = False
