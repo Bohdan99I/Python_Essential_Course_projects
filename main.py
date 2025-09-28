@@ -1,285 +1,240 @@
-import random
+# pylint: disable=no-member
 import pygame
-from os import listdir, path
+import random
+import os
 
 pygame.init()
 
-# --- Налаштування ---
 WIDTH, HEIGHT = 800, 600
 FPS = 60
 
-# Кольори
-BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
+YELLOW = (255, 255, 0)
 
-# Шрифти
-FONT = pygame.font.SysFont("Verdana", 20)
-BIG_FONT = pygame.font.SysFont("Verdana", 50, bold=True)
+PLAYER_SIZE = (80, 50)
+ENEMY_SIZE = (50, 30)
+BONUS_SIZE = (30, 30)
 
-# Шляхи
-IMGS_PATH = "goose"
+FONT = pygame.font.SysFont("Arial", 36)
 HIGHSCORE_FILE = "highscore.txt"
 
 
-# --- Базовий клас для всіх об'єктів гри ---
 class GameObject:
+    """Base class for all objects"""
+
     def __init__(self, image, rect, speed):
         self._image = image
         self._rect = rect
         self._speed = speed
 
-    @property
-    def rect(self):
-        return self._rect
-
-    @property
-    def image(self):
-        return self._image
-
     def draw(self, surface):
         surface.blit(self._image, self._rect)
 
     def update(self):
-        pass  # Метод буде перевизначений у дочірніх класах
+        raise NotImplementedError
 
 
-# --- Клас Гравця ---
 class Player(GameObject):
+    """Player-controlled goose"""
+
     def __init__(self, images, speed):
         self._images = images
         self._img_index = 0
-        self._speed = speed
-        self._image = images[0]
-        self._rect = self._image.get_rect()
+        rect = images[0].get_rect(center=(WIDTH // 2, HEIGHT - 70))
+        super().__init__(images[0], rect, speed)
+
+    @property
+    def images(self):
+        return self._images
 
     def move(self, keys):
         if keys[pygame.K_DOWN] and self._rect.bottom < HEIGHT:
-            self._rect = self._rect.move(0, self._speed)
+            self._rect.y += self._speed
         if keys[pygame.K_UP] and self._rect.top > 0:
-            self._rect = self._rect.move(0, -self._speed)
+            self._rect.y -= self._speed
         if keys[pygame.K_RIGHT] and self._rect.right < WIDTH:
-            self._rect = self._rect.move(self._speed, 0)
+            self._rect.x += self._speed
         if keys[pygame.K_LEFT] and self._rect.left > 0:
-            self._rect = self._rect.move(-self._speed, 0)
+            self._rect.x -= self._speed
 
     def change_image(self):
         self._img_index = (self._img_index + 1) % len(self._images)
         self._image = self._images[self._img_index]
 
 
-# --- Клас Ворога ---
 class Enemy(GameObject):
+    """Enemy object"""
+
     def update(self):
         self._rect = self._rect.move(-self._speed, 0)
 
 
-# --- Клас Бонусу ---
 class Bonus(GameObject):
+    """Bonus object"""
+
     def update(self):
         self._rect = self._rect.move(0, self._speed)
 
 
-# --- Головний клас гри ---
 class Game:
+    """Main game class"""
+
     def __init__(self):
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption("GOOSE GAME")
+        pygame.display.set_caption("Goose Game")
+
         self.clock = pygame.time.Clock()
-
-        # Фон
         self.bg = pygame.transform.scale(
-            pygame.image.load("background.png").convert(), (WIDTH, HEIGHT)
+            pygame.image.load("background.png"), (WIDTH, HEIGHT)
         )
-        self.bgX = 0
-        self.bgX2 = self.bg.get_width()
-        self.bg_speed = 3
 
-        # Гравець
-        player_images = [
-            pygame.image.load(IMGS_PATH + "/" + file).convert_alpha()
-            for file in listdir(IMGS_PATH)
+        goose_images = [
+            pygame.transform.scale(pygame.image.load("goose1.png"), PLAYER_SIZE),
+            pygame.transform.scale(pygame.image.load("goose2.png"), PLAYER_SIZE),
         ]
-        self.player = Player(player_images, speed=10)
+        self.player = Player(goose_images, speed=10)
 
-        # Вороги та бонуси
         self.enemies = []
         self.bonuses = []
-
-        # Стани гри
-        self.is_running = True
-        self.game_started = False
-        self.game_over = False
         self.scores = 0
         self.high_score = self.load_highscore()
+        self.game_started = False
+        self.game_over = False
 
-        # Події
-        self.CREATE_ENEMY = pygame.USEREVENT + 1
-        pygame.time.set_timer(self.CREATE_ENEMY, 1500)
-        self.CREATE_BONUS = pygame.USEREVENT + 2
-        pygame.time.set_timer(self.CREATE_BONUS, 1500)
-        self.CHANGE_IMG = pygame.USEREVENT + 3
-        pygame.time.set_timer(self.CHANGE_IMG, 125)
+        pygame.time.set_timer(pygame.USEREVENT + 1, 1500)
+        pygame.time.set_timer(pygame.USEREVENT + 2, 2500)
+        pygame.time.set_timer(pygame.USEREVENT + 3, 200)
 
-    # --- Highscore ---
+    def run(self):
+        """Main loop"""
+        while True:
+            self.clock.tick(FPS)
+            self.handle_gameplay()
+
+    def handle_gameplay(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.save_highscore()
+                pygame.quit()
+                raise SystemExit
+            if event.type == pygame.KEYDOWN:
+                if not self.game_started:
+                    self.game_started = True
+                elif self.game_over and event.key == pygame.K_RETURN:
+                    self.reset_game()
+            if (
+                event.type == pygame.USEREVENT + 1
+                and self.game_started
+                and not self.game_over
+            ):
+                self.create_enemy()
+            if (
+                event.type == pygame.USEREVENT + 2
+                and self.game_started
+                and not self.game_over
+            ):
+                self.create_bonus()
+            if (
+                event.type == pygame.USEREVENT + 3
+                and self.game_started
+                and not self.game_over
+            ):
+                self.player.change_image()
+
+        self.screen.blit(self.bg, (0, 0))
+
+        if not self.game_started:
+            self.draw_start_screen()
+        elif self.game_over:
+            self.draw_game_over()
+        else:
+            keys = pygame.key.get_pressed()
+            self.player.move(keys)
+
+            for enemy in self.enemies[:]:
+                enemy.update()
+                if enemy._rect.right < 0:
+                    self.enemies.remove(enemy)
+
+            for bonus in self.bonuses[:]:
+                bonus.update()
+                if bonus._rect.top > HEIGHT:
+                    self.bonuses.remove(bonus)
+
+            for enemy in self.enemies:
+                if self.player._rect.colliderect(enemy._rect):
+                    self.game_over = True
+                    if self.scores > self.high_score:
+                        self.high_score = self.scores
+                        self.save_highscore()
+
+            for bonus in self.bonuses[:]:
+                if self.player._rect.colliderect(bonus._rect):
+                    self.scores += 1
+                    self.bonuses.remove(bonus)
+
+            self.player.draw(self.screen)
+            for enemy in self.enemies:
+                enemy.draw(self.screen)
+            for bonus in self.bonuses:
+                bonus.draw(self.screen)
+
+            score_text = FONT.render(f"Score: {self.scores}", True, WHITE)
+            self.screen.blit(score_text, (10, 10))
+
+            high_score_text = FONT.render(
+                f"High Score: {self.high_score}", True, YELLOW
+            )
+            self.screen.blit(high_score_text, (10, 50))
+
+        pygame.display.flip()
+
+    def create_enemy(self):
+        enemy_img = pygame.transform.scale(pygame.image.load("enemy.png"), ENEMY_SIZE)
+        enemy_rect = pygame.Rect(WIDTH, random.randint(50, HEIGHT - 50), *ENEMY_SIZE)
+        self.enemies.append(Enemy(enemy_img, enemy_rect, speed=random.randint(3, 6)))
+
+    def create_bonus(self):
+        bonus_img = pygame.transform.scale(pygame.image.load("bonus.png"), BONUS_SIZE)
+        bonus_rect = pygame.Rect(
+            random.randint(50, WIDTH - 50), -BONUS_SIZE[1], *BONUS_SIZE
+        )
+        self.bonuses.append(Bonus(bonus_img, bonus_rect, speed=random.randint(2, 5)))
+
+    def draw_text_center(self, text, color, y_offset=0):
+        label = FONT.render(text, True, color)
+        rect = label.get_rect(center=(WIDTH // 2, HEIGHT // 2 + y_offset))
+        self.screen.blit(label, rect)
+
+    def draw_start_screen(self):
+        self.draw_text_center("Press any key to start", WHITE)
+
+    def draw_game_over(self):
+        self.draw_text_center("GAME OVER", RED, -50)
+        self.draw_text_center(f"Your Score: {self.scores}", WHITE, 0)
+        self.draw_text_center(f"High Score: {self.high_score}", YELLOW, 50)
+        self.draw_text_center("Press Enter to Restart", GREEN, 100)
+
+    def reset_game(self):
+        self.player = Player(self.player.images, speed=10)
+        self.enemies = []
+        self.bonuses = []
+        self.scores = 0
+        self.game_over = False
+
     def load_highscore(self):
-        if path.exists(HIGHSCORE_FILE):
-            with open(HIGHSCORE_FILE, "r") as f:
-                try:
-                    return int(f.read())
-                except ValueError:
-                    return 0
+        if os.path.exists(HIGHSCORE_FILE):
+            with open(HIGHSCORE_FILE, "r", encoding="utf-8") as f:
+                return int(f.read().strip())
         return 0
 
     def save_highscore(self):
-        if self.scores > self.high_score:
-            self.high_score = self.scores
-            with open(HIGHSCORE_FILE, "w") as f:
-                f.write(str(self.high_score))
-
-    # --- Створення ворогів та бонусів ---
-    def create_enemy(self):
-        img = pygame.image.load("enemy.png").convert_alpha()
-        rect = pygame.Rect(
-            WIDTH, random.randint(0, HEIGHT - img.get_height()), *img.get_size()
-        )
-        speed = random.randint(4, 6)
-        self.enemies.append(Enemy(img, rect, speed))
-
-    def create_bonus(self):
-        img = pygame.image.load("bonus.png").convert_alpha()
-        rect = pygame.Rect(
-            random.randint(0, WIDTH - img.get_width()), 0, *img.get_size()
-        )
-        speed = random.randint(4, 6)
-        self.bonuses.append(Bonus(img, rect, speed))
-
-    # --- Рендер тексту ---
-    def draw_text_center(self, text, font_obj, color, y):
-        surf = font_obj.render(text, True, color)
-        self.screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, y))
-
-    # --- Стартовий екран ---
-    def draw_start_screen(self):
-        self.screen.fill(BLACK)
-        self.draw_text_center("GOOSE GAME", BIG_FONT, GREEN, HEIGHT // 3)
-        self.draw_text_center("Press ENTER to Start", FONT, WHITE, HEIGHT // 2)
-        self.draw_text_center(
-            "Use arrows to move, collect bonuses, avoid enemies",
-            FONT,
-            WHITE,
-            HEIGHT // 2 + 40,
-        )
-        self.draw_text_center(
-            f"High Score: {self.high_score}", FONT, GREEN, HEIGHT // 2 + 80
-        )
-        pygame.display.flip()
-
-    # --- Екран Game Over ---
-    def draw_game_over(self):
-        self.screen.fill(BLACK)
-        self.draw_text_center("GAME OVER", BIG_FONT, RED, HEIGHT // 3)
-        self.draw_text_center(f"Your score: {self.scores}", FONT, WHITE, HEIGHT // 2)
-        self.draw_text_center(
-            f"High Score: {self.high_score}", FONT, GREEN, HEIGHT // 2 + 40
-        )
-        self.draw_text_center(
-            "Press R to Restart or ESC to Quit", FONT, WHITE, HEIGHT // 2 + 80
-        )
-        pygame.display.flip()
-
-    # --- Перезапуск гри ---
-    def reset_game(self):
-        self.enemies.clear()
-        self.bonuses.clear()
-        self.scores = 0
-        self.player = Player(self.player._images, speed=10)
-        self.bgX = 0
-        self.bgX2 = self.bg.get_width()
-        self.game_over = False
-
-    # --- Основний цикл гри ---
-    def run(self):
-        while self.is_running:
-            self.clock.tick(FPS)
-            if not self.game_started:
-                self.draw_start_screen()
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        self.is_running = False
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_RETURN:
-                            self.game_started = True
-                            self.reset_game()
-            elif not self.game_over:
-                self.handle_gameplay()
-            else:
-                self.draw_game_over()
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        self.is_running = False
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_r:
-                            self.reset_game()
-                        elif event.key == pygame.K_ESCAPE:
-                            self.is_running = False
-
-    def handle_gameplay(self):
-        keys = pygame.key.get_pressed()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.is_running = False
-            elif event.type == self.CREATE_ENEMY:
-                self.create_enemy()
-            elif event.type == self.CREATE_BONUS:
-                self.create_bonus()
-            elif event.type == self.CHANGE_IMG:
-                self.player.change_image()
-
-        # Рух фону
-        self.bgX -= self.bg_speed
-        self.bgX2 -= self.bg_speed
-        if self.bgX < -self.bg.get_width():
-            self.bgX = self.bg.get_width()
-        if self.bgX2 < -self.bg.get_width():
-            self.bgX2 = self.bg.get_width()
-
-        # Малюємо фон та гравця
-        self.screen.blit(self.bg, (self.bgX, 0))
-        self.screen.blit(self.bg, (self.bgX2, 0))
-        self.player.move(keys)
-        self.player.draw(self.screen)
-
-        # Відображення рахунку
-        score_surf = FONT.render(str(self.scores), True, RED)
-        high_surf = FONT.render(f"High: {self.high_score}", True, GREEN)
-        self.screen.blit(score_surf, (WIDTH - 50, 20))
-        self.screen.blit(high_surf, (20, 20))
-
-        # Оновлення ворогів
-        for enemy in self.enemies[:]:
-            enemy.update()
-            enemy.draw(self.screen)
-            if enemy.rect.right < 0:
-                self.enemies.remove(enemy)
-            if self.player.rect.colliderect(enemy.rect):
-                self.game_over = True
-                self.save_highscore()
-
-        # Оновлення бонусів
-        for bonus in self.bonuses[:]:
-            bonus.update()
-            bonus.draw(self.screen)
-            if bonus.rect.top >= HEIGHT:
-                self.bonuses.remove(bonus)
-            if self.player.rect.colliderect(bonus.rect):
-                self.bonuses.remove(bonus)
-                self.scores += 1
-
-        pygame.display.flip()
+        with open(HIGHSCORE_FILE, "w", encoding="utf-8") as f:
+            f.write(str(self.high_score))
 
 
 if __name__ == "__main__":
-    game = Game()
-    game.run()
+    Game().run()
