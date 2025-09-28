@@ -5,35 +5,41 @@ Goose Game: Проста гра на Pygame, де гравець-гусак ма
 import os
 import random
 import pygame
+from config import (
+    FONT_FAMILY,
+    FONT_SIZE_SMALL,
+    FONT_SIZE_BIG,
+    WIDTH,
+    HEIGHT,
+    ASSETS_DIR,
+    GOOSE_DIR,
+    PLAYER_SPEED,
+    PLAYER_SIZE,
+    ENEMY_SIZE,
+    BONUS_SIZE,
+    BG_SPEED,
+    CREATE_ENEMY_EVENT,
+    ENEMY_INTERVAL,
+    CREATE_BONUS_EVENT,
+    BONUS_INTERVAL,
+    CHANGE_IMG_EVENT,
+    ANIMATION_INTERVAL,
+    FPS,
+    HIGHSCORE_FILE,
+    BLACK,
+    WHITE,
+    RED,
+    GREEN,
+)
 
 pygame.init()
 
-# --- Константи та налаштування ---
-WIDTH, HEIGHT = 800, 600
-FPS = 60
+FONT = pygame.font.SysFont(FONT_FAMILY, FONT_SIZE_SMALL)
+BIG_FONT = pygame.font.SysFont(FONT_FAMILY, FONT_SIZE_BIG, bold=True)
 
-# Кольори
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-
-# Розміри об'єктів
-PLAYER_SIZE = (100, 60)
-ENEMY_SIZE = (60, 40)
-BONUS_SIZE = (40, 40)
-
-# Шрифти
-FONT = pygame.font.SysFont("Verdana", 20)
-BIG_FONT = pygame.font.SysFont("Verdana", 50, bold=True)
-
-# Файли та шляхи
-HIGHSCORE_FILE = "highscore.txt"
-# Примітка: Для коректної роботи коду має існувати папка 'assets'
-# з 'background.png', 'enemy.png', 'bonus.png' та підпапка 'goose'
-# з 'goose1.png' до 'goose5.png'.
-ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
-GOOSE_DIR = os.path.join(ASSETS_DIR, "goose")
+BASE_DIR = os.path.dirname(__file__)
+ASSETS_PATH = os.path.join(BASE_DIR, ASSETS_DIR)
+GOOSE_PATH = os.path.join(BASE_DIR, GOOSE_DIR)
 
 
 # --- Базовий клас об'єктів ---
@@ -56,11 +62,7 @@ class GameObject:
         surface.blit(self._image, self._rect)
 
     def update(self):
-        """
-        Оновлює стан об'єкта (зазвичай рух).
-        Базовий об'єкт не рухається за замовчуванням.
-        """
-        # FIX: Прибрано 'pass' для W0107
+        """Оновлює стан об'єкта. Базовий об'єкт не рухається за замовчуванням."""
         pass
 
 
@@ -77,7 +79,6 @@ class Player(GameObject):
         initial_image = images[0]
         initial_rect = initial_image.get_rect(center=(WIDTH // 2, HEIGHT - 70))
 
-        # Виклик конструктора базового класу
         super().__init__(initial_image, initial_rect, speed)
 
     def move(self, keys):
@@ -125,26 +126,25 @@ class Game:
         pygame.display.set_caption("GOOSE GAME")
         self.clock = pygame.time.Clock()
 
-        # Фон
         self.bg = pygame.transform.scale(
-            pygame.image.load(os.path.join(ASSETS_DIR, "background.png")).convert(),
+            pygame.image.load(os.path.join(ASSETS_PATH, "background.png")).convert(),
             (WIDTH, HEIGHT),
         )
         self.bg_x = 0
         self.bg_x2 = self.bg.get_width()
-        self.bg_speed = 3
+        self.bg_speed = BG_SPEED
 
-        # Гравець (Зберігаємо список зображень для подальшого скидання)
+        # Гравець
         self.player_images = [
             pygame.transform.scale(
                 pygame.image.load(
-                    os.path.join(GOOSE_DIR, f"goose{i}.png")
+                    os.path.join(GOOSE_PATH, f"goose{i}.png")
                 ).convert_alpha(),
                 PLAYER_SIZE,
             )
             for i in range(1, 6)
         ]
-        self.player = Player(self.player_images, speed=10)
+        self.player = Player(self.player_images, speed=PLAYER_SPEED)
 
         # Вороги та бонуси
         self.enemies = []
@@ -157,14 +157,15 @@ class Game:
         self.scores = 0
         self.high_score = self.load_highscore()
 
-        # Події (Константи)
-        # FIX: Перейменовано для C0103
-        self.create_enemy_event = pygame.USEREVENT + 1
-        pygame.time.set_timer(self.create_enemy_event, 1500)
-        self.create_bonus_event = pygame.USEREVENT + 2
-        pygame.time.set_timer(self.create_bonus_event, 1500)
-        self.change_img_event = pygame.USEREVENT + 3
-        pygame.time.set_timer(self.change_img_event, 125)
+        # Події (Константи та таймери)
+        self.create_enemy_event = CREATE_ENEMY_EVENT
+        pygame.time.set_timer(self.create_enemy_event, ENEMY_INTERVAL)
+
+        self.create_bonus_event = CREATE_BONUS_EVENT
+        pygame.time.set_timer(self.create_bonus_event, BONUS_INTERVAL)
+
+        self.change_img_event = CHANGE_IMG_EVENT
+        pygame.time.set_timer(self.change_img_event, ANIMATION_INTERVAL)
 
     # --- Highscore ---
     def load_highscore(self):
@@ -174,7 +175,6 @@ class Game:
                 try:
                     return int(file.read())
                 except ValueError:
-                    # Повертаємо 0, якщо файл містить невірні дані
                     return 0
         return 0
 
@@ -189,7 +189,7 @@ class Game:
     def create_enemy(self):
         """Створює новий об'єкт ворога та додає його до списку."""
         img = pygame.transform.scale(
-            pygame.image.load(os.path.join(ASSETS_DIR, "enemy.png")).convert_alpha(),
+            pygame.image.load(os.path.join(ASSETS_PATH, "enemy.png")).convert_alpha(),
             ENEMY_SIZE,
         )
         rect = img.get_rect(midtop=(WIDTH, random.randint(0, HEIGHT - ENEMY_SIZE[1])))
@@ -199,7 +199,7 @@ class Game:
     def create_bonus(self):
         """Створює новий об'єкт бонусу та додає його до списку."""
         img = pygame.transform.scale(
-            pygame.image.load(os.path.join(ASSETS_DIR, "bonus.png")).convert_alpha(),
+            pygame.image.load(os.path.join(ASSETS_PATH, "bonus.png")).convert_alpha(),
             BONUS_SIZE,
         )
         rect = img.get_rect(midtop=(random.randint(0, WIDTH - BONUS_SIZE[0]), 0))
@@ -249,7 +249,7 @@ class Game:
         self.enemies.clear()
         self.bonuses.clear()
         self.scores = 0
-        self.player = Player(self.player_images, speed=10)
+        self.player = Player(self.player_images, speed=PLAYER_SPEED)
         self.bg_x = 0
         self.bg_x2 = self.bg.get_width()
         self.game_over = False
@@ -287,12 +287,11 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.is_running = False
-            # FIX: Використання нових імен подій
-            elif event.type == self.create_enemy_event:
+            elif event.type == CREATE_ENEMY_EVENT:
                 self.create_enemy()
-            elif event.type == self.create_bonus_event:
+            elif event.type == CREATE_BONUS_EVENT:
                 self.create_bonus()
-            elif event.type == self.change_img_event:
+            elif event.type == CHANGE_IMG_EVENT:
                 self.player.change_image()
 
         # Рух фону
